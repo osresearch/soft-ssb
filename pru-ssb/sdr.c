@@ -173,7 +173,7 @@ generate_bit(
 
 			// ssb has range -1024 to 1024;
 			// convert to 0 to 256
-			buf[i] = shuffle(ssb / 8 + 127);
+			buf[4096*j + i] = shuffle(ssb / 8 + 127);
 
 			// mark an unused bit; the pru will zero
 			// this when it is halfway through the buffer.
@@ -185,7 +185,7 @@ generate_bit(
 static void
 output_bit(
 	volatile uint16_t * const pru_buf,
-	const uint16_t * const bit_buf
+	const uint16_t * bit_buf
 )
 {
 	for (unsigned i = 0 ; i < 313 ; i++)
@@ -195,9 +195,10 @@ output_bit(
 		while((pru_buf[0] & (1<<8)) != 0)
 			;
 
-		for (unsigned x = 0 ; x < 4096 ; x++)
-			pru_buf[x] = bit_buf[i*4096 + x];
+		memcpy(pru_buf, bit_buf, 8192);
+
 		pru_buf[0] |= (1 << 8) | (1 << 15);
+		bit_buf += 4096;
 	}
 }
 
