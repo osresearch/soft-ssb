@@ -1,5 +1,15 @@
 /*  
 * pru dts file BB-BONE-PRU-00A0.dts  
+*
+* Available outputs on pru 0 and their r30 pins:
+* p9.25: 7
+* p9.27: 5
+* p9.28: 3
+* p9.29: 1
+* p9.30: 2
+* p9.31: 0
+* p8.11: 15
+* p8.12: 14
 */  
 /dts-v1/;  
 /plugin/;  
@@ -12,15 +22,22 @@
   version = "00A0";  
   
   exclusive-use =  
-    "P8.11";  
+    "P8.11", "P8.12", "P9.25", "P2.27", "P9.28", "P9.30", "P9.31";
   
   fragment@0 {  
     target = <&am33xx_pinmux>;  
     __overlay__ {  
-      mygpio: pinmux_mygpio{  
+      mygpio: pinmux_mygpio {
         pinctrl-single,pins = <  
-          0x34 0x06  
-          >;  
+		0x034 0x06 // p8.11, why are these two mode 6?
+		0x030 0x06 // p8.12
+		0x1ac 0x05 // p9.25
+		0x1a4 0x05 // p9.27
+		0x19c 0x05 // p9.28
+		0x194 0x05 // p9.29
+		0x198 0x05 // p9.30
+		0x190 0x05 // p9.31
+        >;  
       };  
     };  
   };  

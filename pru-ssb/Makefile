@@ -118,12 +118,12 @@ FIRMWARE=/lib/firmware/$(CAPE)-00A0.dtbo
 #$(FIRMWARE): $(CAPE).dts
 #	dtc -I dts -O dtb $< > $@
 $(FIRMWARE): FORCE
-	dtc -I dts -O dtb $(CAPE).dts > $@
+	dtc -@ -I dts -O dtb -o $@ $(CAPE).dts
 
 FORCE:
 
 firmware: $(FIRMWARE)
-	echo $(CAPE) > /sys/devices/bone_capemgr.9/slots
+	echo $(CAPE) > /sys/devices/bone_capemgr.8/slots
 
 # Include all of the generated dependency files
 -include .*.o.d
