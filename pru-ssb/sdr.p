@@ -97,7 +97,7 @@ START:
 | (1 << 15) \
 
 	MOV length, 8192
-	MOV half, 4096
+	MOV half, 6000
 
 	MOV r10, 0
 	MOV r11, GPIO_MASK
