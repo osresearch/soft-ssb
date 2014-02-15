@@ -6,6 +6,50 @@
 
 int16_t sin_table[128];
 
+//IntervalTimer carrier_timer;
+
+static void
+periodic_timer_configure(
+	uint32_t interval
+)
+{
+	// Enable clock to PIT  
+	SIM_SCGC6 |= SIM_SCGC6_PIT;
+
+	// Enable PIT module  
+	PIT_MCR = 0;
+
+	// Set re-load value  
+	PIT_LDVAL0 = interval-1;  
+
+	// Enable this channel without interrupts  
+	PIT_TCTRL0 = 1;
+
+	// Clear timer flag  
+	PIT_TFLG0 = 1;
+}
+
+
+static void
+periodic_timer_disable(void)
+{
+	PIT_TCTRL0 = 0;   
+}
+
+
+static int
+periodic_timer_expired(void)
+{
+	int rc = (PIT_TFLG0 & 1) != 0;
+
+	// Clear timer flag if it is set
+	if (rc)
+		PIT_TFLG0 = 1;
+
+	return rc;
+}
+
+
 void
 setup(void)
 {
@@ -15,6 +59,11 @@ setup(void)
 
 	for (int i = 0 ; i < 128 ; i++)
 		sin_table[i] = sin(i * M_PI / 64) * 2048;
+
+	//carrier_timer.begin(ssb_output, 1.5);
+
+	// Controls the period of the carrier output
+	periodic_timer_configure(50);
 }
 
 
@@ -23,8 +72,8 @@ dac_output(
 	uint16_t x
 )
 {
-	//if (x < 0) x = 0;
-	//if (x > 4096) x = 4096;
+	if (x < 0) x = 0;
+	if (x > 4095) x = 4095;
 	*(volatile uint16_t*)&(DAC0_DAT0L) = x;
 }
 
@@ -36,16 +85,6 @@ ssb_output(
 )
 {
 	static uint32_t i = 0;
-	static uint32_t old_usec = 0;
-
-	while (1)
-	{
-		uint32_t now = (SYST_CVR & 0xFFFFFF) >> 6;
-		if (old_usec == now)
-			continue;
-		old_usec = now;
-		break;
-	}
 
 	const uint16_t p = i % 128;
 	if (p == 0 || p == 64)
@@ -64,8 +103,6 @@ ssb_output(
 	//int32_t signal = s;
 #endif
 	signal += 2048; // shift to zero offset
-	//signal /= 2;
-
 
 	dac_output(signal);
 	i += 8;
@@ -76,6 +113,7 @@ void
 loop(void)
 {
 	uint32_t sig = 0;
+	static uint8_t bytes[] = { 0xA5, 0x00, 0xFF, 0x18, 0xFF };
 
 	while (1)
 	{
@@ -86,7 +124,16 @@ loop(void)
 		int32_t ps = +sin_table[ps_i % 128];
 		int32_t pc = -sin_table[pc_i % 128];
 
+		// after 1024 cycles, pulse off
+		if (sig & 0x400000)
+		{
+			ps /= 4;
+			pc /= 4;
+		}
+
+		while (!periodic_timer_expired())
+			;
 		ssb_output(ps, pc);
-		sig += 5;
+		sig += 16;
 	}
 }
