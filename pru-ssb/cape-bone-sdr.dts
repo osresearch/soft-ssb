@@ -2,14 +2,14 @@
 * pru dts file BB-BONE-PRU-00A0.dts  
 *
 * Available outputs on pru 0 and their r30 pins:
-* p9.25: 7
-* p9.27: 5
-* p9.28: 3
+* p9.31: 0
 * p9.29: 1
 * p9.30: 2
-* p9.31: 0
-* p8.11: 15
+* p9.28: 3
+* p9.27: 5
+* p9.25: 7
 * p8.12: 14
+* p8.11: 15
 */  
 /dts-v1/;  
 /plugin/;  

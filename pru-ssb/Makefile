@@ -42,6 +42,7 @@ CFLAGS += \
 LDFLAGS += \
 
 LDLIBS += \
+	-lm \
 	-lpthread \
 
 

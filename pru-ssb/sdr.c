@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "pru.h"
 
 static uint16_t
@@ -14,12 +15,12 @@ shuffle(
 	uint8_t x_in
 )
 {
-	uint16_t x = x_in;
+	uint16_t x = x_in >> 1; // ignore bottom bit; only have 7 wired
 	uint16_t y = 0
 	  | (x & 0x0F) << 0
 	  | (x & 0x10) << 1
 	  | (x & 0x20) << 2
-	  | (x & 0xC0) << 6
+	  | (x & 0xC0) << 8
 	  ;
 
 	return y;
@@ -49,7 +50,7 @@ main(void)
 	{
 		for (int i = 0 ; i < 4096 ; i++)
 		{
-			buf[i] = shuffle(i);
+			buf[i] = shuffle(sin(256*i*M_PI/2048) * 128 + 127);
 		}
 
 		//*pru_cmd = pru->ddr_addr;
