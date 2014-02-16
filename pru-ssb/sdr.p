@@ -101,11 +101,21 @@ START:
 
 forever:
 	MOV offset, 0
+
+	// each bit of output takes 25 ns;
 read_loop:
-	LBCO r10, CONST_PRUDRAM, offset, 4
+
+#ifdef CONFIG_PARANOID
+	// If we are paranoid, don't write directly to the r30 outputs
+	LBCO r10, CONST_PRUDRAM, offset, 2
 	AND r30, r10, r11
-	ADD offset, offset, 2
-	QBNE read_loop, offset, length
+#else
+	// Save some instructions -- read directly into the r30 output
+	LBCO r30, CONST_PRUDRAM, offset, 2	// 15 ns?
+#endif
+
+	ADD offset, offset, 2			// 5 ns
+	QBNE read_loop, offset, length		// 5 ns
 	QBA forever
 
 #if 0

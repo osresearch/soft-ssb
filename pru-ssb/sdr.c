@@ -51,6 +51,10 @@ main(void)
 		for (int i = 0 ; i < 4096 ; i++)
 		{
 			buf[i] = shuffle(sin(256*i*M_PI/2048) * 128 + 127);
+
+			// debug: flag our output on the 8th bit
+			if (i < 16)
+				buf[i] |= 1 << 15;
 		}
 
 		//*pru_cmd = pru->ddr_addr;
