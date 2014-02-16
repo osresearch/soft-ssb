@@ -26,6 +26,7 @@
 #define col r2
 #define offset r3
 #define length r4
+#define half r5
 #define gpio1_base r6
 #define timer_ptr r8
 
@@ -96,27 +97,31 @@ START:
 | (1 << 15) \
 
 	MOV length, 8192
+	MOV half, 4096
+
 	MOV r10, 0
 	MOV r11, GPIO_MASK
+	MOV r12, 1 << 8 // signal that we're half way
 
-forever:
+restart:
 	MOV offset, 0
 
-	// each bit of output takes 25 ns;
-read_loop:
-
-#ifdef CONFIG_PARANOID
-	// If we are paranoid, don't write directly to the r30 outputs
-	LBCO r10, CONST_PRUDRAM, offset, 2
-	AND r30, r10, r11
-#else
+read_loop1:
 	// Save some instructions -- read directly into the r30 output
+	// each bit of output takes 25 ns;
 	LBCO r30, CONST_PRUDRAM, offset, 2	// 15 ns?
-#endif
-
 	ADD offset, offset, 2			// 5 ns
-	QBNE read_loop, offset, length		// 5 ns
-	QBA forever
+	QBNE read_loop1, offset, half		// 5 ns
+
+	// signal that we're half-way through
+	SBCO r12, CONST_PRUDRAM, 0, 2
+
+read_loop2:
+	LBCO r30, CONST_PRUDRAM, offset, 2	// 15 ns?
+	ADD offset, offset, 2			// 5 ns
+	QBNE read_loop2, offset, length		// 5 ns
+
+	QBA restart
 
 #if 0
 bit_loop:

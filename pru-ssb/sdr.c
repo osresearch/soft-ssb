@@ -46,6 +46,7 @@ main(void)
 	printf("ddr %p (%08x)\n", vram, pru->ddr_addr);
 
 	volatile uint16_t * const buf = pru_cmd;
+	int pass = 10;
 	while (1)
 	{
 		for (int i = 0 ; i < 4096 ; i++)
@@ -53,12 +54,16 @@ main(void)
 			buf[i] = shuffle(sin(256*i*M_PI/2048) * 128 + 127);
 
 			// debug: flag our output on the 8th bit
-			if (i < 16)
+			if (i < pass)
 				buf[i] |= 1 << 15;
 		}
 
 		//*pru_cmd = pru->ddr_addr;
-		usleep(1000);
+		//usleep(1000);
+		// wait for a signal that we're halfway
+		while((buf[0] & (1<<8)) == 0)
+			;
+		pass = (pass + 1) & 0xFF;
 	}
 
 	return 0;
