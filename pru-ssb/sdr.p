@@ -101,7 +101,7 @@ START:
 
 	MOV r10, 0
 	MOV r11, GPIO_MASK
-	MOV r12, 1 << 8 // signal that we're half way
+	MOV r12, 0
 
 restart:
 	MOV offset, 0
