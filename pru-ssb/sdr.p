@@ -89,28 +89,35 @@ START:
 
 #define GPIO_MASK 0 \
 | (1 << 0) \
-| (1 << 2) \
 | (1 << 1) \
+| (1 << 2) \
 | (1 << 3) \
 | (1 << 5) \
 | (1 << 7) \
-| (1 << 15) \
 | (1 << 14) \
+| (1 << 15) \
 
 	MOV pin0, GPIO_MASK
+	MOV r10, 0
 
 bit_loop:
-	MOV r30, 0
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
+	ADD r10, r10, 1
 
-	MOV r30, pin0
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
-	NOP; NOP; NOP; NOP
+	// shuffle the bits from r10 into r11 and then copy to r30
+	AND r11, r10, 0xF
+
+	AND r12, r10, (1 << 4)
+	LSL r12, r12, 1 // bit 4 -> 5
+	OR r11, r11, r12
+
+	AND r12, r10, (1 << 5)
+	LSL r12, r12, 2 // bit 5 -> 7
+	OR r11, r11, r12
+
+	AND r12, r10, (1 << 6) | (1 << 7)
+	LSL r12, r12, 8 // bit 6,7 -> 14,15
+	OR r30, r11, r12
+	
 	QBA bit_loop
 	
 EXIT:
