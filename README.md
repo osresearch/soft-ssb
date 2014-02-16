@@ -1,4 +1,4 @@
-!(Soft SSB being received with fldigi)[http://farm4.staticflickr.com/3732/12551247315_49f8957bd6_z_d.jpg]
+![Soft SSB being received with fldigi](http://farm4.staticflickr.com/3732/12551247315_49f8957bd6_z_d.jpg)
 
 Software SSB
 ============
