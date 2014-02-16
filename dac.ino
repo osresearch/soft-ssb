@@ -139,58 +139,66 @@ ssb_output(
 10111000
 */
 
-static const uint8_t bytes[] = {
-0xAD,
-0x3B,
-0xA5,
-0x69,
-0xDD,
-0x26,
-0xE9,
-0x7B,
-0x3F,
-0xCA,
-0xB8,
-};
+static const uint8_t bits[] = ""
+"1010110100" // C
+"11101110100" // Q
+"100" // space
+"1010110100" // C
+"11101110100" // Q
+"100" // space
+"1101110100" // N
+"10111101100" // Y
+"1111111100" // 3
+"10101011100" // U
+"100" // space
+;
 
 void
 loop(void)
 {
 	uint32_t sig = 0;
 	int bit_offset = 0;
-	const int bit_count = sizeof(bytes) * 8;
+	const int bit_count = sizeof(bits);
 	int do_ramp = 1;
 	int cur_bit = 0;
 	int new_bit = 0;
+	int phase = 0;
 
 	while (1)
 	{
-		// signal sin and cos
-		const uint16_t ps_i = sig >> 3;
-		const uint16_t pc_i = ps_i + 32 + 64;
-
-		int32_t ps = +sin_table[ps_i % 128];
-		int32_t pc = -sin_table[pc_i % 128];
-
 #if 1
 		// we want 31.250 Hz for our bit clock,
 		// 960000 / 31.250 == 30720 cycles
-#define ramp_size 2048
+#define ramp_size 4096
 #define bit_len 16384
 
 		if (sig == bit_len)
 		{
 			// time for the next bit
+			if (do_ramp)
+				phase ^= 1;
+
 			sig = 0;
 			cur_bit = new_bit;
+			//digitalWriteFast(12, phase == 0);
 		}
+
+		// signal sin and cos
+		uint16_t ps_i = sig >> 3;
+		if (phase)
+			ps_i += 64;
+
+		uint16_t pc_i = ps_i + 32;
+
+		int32_t ps = +sin_table[ps_i % 128];
+		int32_t pc = -sin_table[pc_i % 128];
 
 if (1)
 {
 		if (sig < ramp_size)
 		{
 			// ramp up if this bit is unchanged
-			if (!do_ramp)
+			if (do_ramp)
 			{
 				int32_t mag = sig;
 				ps = (ps * mag) / ramp_size;
@@ -199,9 +207,7 @@ if (1)
 		}
 		if (sig == (bit_len - ramp_size))
 		{
-			new_bit = bytes[bit_offset / 8];
-			new_bit >>= 7 - (bit_offset % 8);
-			new_bit &= 1;
+			new_bit = bits[bit_offset] == '1';
 			if (new_bit == 0)
 				do_ramp = 1;
 			else
@@ -213,7 +219,7 @@ if (1)
 		if (sig > (bit_len - ramp_size))
 		{
 			// ramp down if this bit will not change
-			if (!do_ramp)
+			if (do_ramp)
 			{
 				int32_t mag = bit_len - sig;
 				ps = (ps * mag) / ramp_size;
@@ -233,10 +239,7 @@ if (1)
 #if 0
 		dac_output(ps/2 + 2048);
 #else
-		if (do_ramp && cur_bit)
-			ssb_output(ps, pc);
-		else
-			ssb_output(pc, ps);
+		ssb_output(ps, pc);
 #endif
 
 		sig++;
