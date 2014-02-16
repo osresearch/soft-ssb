@@ -24,7 +24,8 @@
 #define data_addr r0
 #define row r1
 #define col r2
-#define pin0 r3
+#define offset r3
+#define length r4
 #define gpio1_base r6
 #define timer_ptr r8
 
@@ -82,9 +83,6 @@ START:
 
     MOV timer_ptr, 0x22000 /* control register */
 
-    // Configure our output pins
-    SBBO pin0, gpio1_base, GPIO_CLRDATAOUT, 4
-
     MOV gpio1_base, GPIO1
 
 #define GPIO_MASK 0 \
@@ -97,9 +95,20 @@ START:
 | (1 << 14) \
 | (1 << 15) \
 
-	MOV pin0, GPIO_MASK
+	MOV length, 8192
 	MOV r10, 0
+	MOV r11, GPIO_MASK
 
+forever:
+	MOV offset, 0
+read_loop:
+	LBCO r10, CONST_PRUDRAM, offset, 4
+	AND r30, r10, r11
+	ADD offset, offset, 2
+	QBNE read_loop, offset, length
+	QBA forever
+
+#if 0
 bit_loop:
 	ADD r10, r10, 1
 
@@ -119,6 +128,7 @@ bit_loop:
 	OR r30, r11, r12
 	
 	QBA bit_loop
+#endif
 	
 EXIT:
 #ifdef AM33XX
