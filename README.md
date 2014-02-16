@@ -1,3 +1,5 @@
+!(Soft SSB being received with fldigi)[http://farm4.staticflickr.com/3732/12551247315_49f8957bd6_z_d.jpg]
+
 Software SSB
 ============
 
@@ -11,7 +13,9 @@ SSB and then uses the builtin DAC hardware to transmit it via a wire
 antenna.
 
 Due to limitations of the DAC and the current software design, the
-output frequency is quite low.  Roughly 64 KHz.
+output frequency is quite low.  Roughly 64 KHz, using 8 steps in the
+carrier wave.  This has successfully transmitted a short distance to
+a SSB receiver and the PSK31 signal decoded by fldigi.
 
 
 PRU SSB
