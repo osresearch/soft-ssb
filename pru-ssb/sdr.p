@@ -87,13 +87,30 @@ START:
 
     MOV gpio1_base, GPIO1
 
-    MOV pin0, 1 << 15
+#define GPIO_MASK 0 \
+| (1 << 0) \
+| (1 << 2) \
+| (1 << 1) \
+| (1 << 3) \
+| (1 << 5) \
+| (1 << 7) \
+| (1 << 15) \
+| (1 << 14) \
+
+	MOV pin0, GPIO_MASK
 
 bit_loop:
-	//SBBO pin0, gpio1_base, GPIO_CLRDATAOUT, 4
-	//SBBO pin0, gpio1_base, GPIO_SETDATAOUT, 4
-	CLR r30.t15
-	SET r30.t15
+	MOV r30, 0
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
+
+	MOV r30, pin0
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
+	NOP; NOP; NOP; NOP
 	QBA bit_loop
 	
 EXIT:
