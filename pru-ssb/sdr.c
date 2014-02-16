@@ -51,7 +51,17 @@ main(void)
 	{
 		for (int i = 0 ; i < 4096 ; i++)
 		{
-			buf[i] = shuffle(sin(256*i*M_PI/2048) * 128 + 127);
+			float t = 256*i*M_PI/2048;
+			float c_sin = sin(t);
+			float c_cos = cos(t);
+
+			float mag = (pass % 256) / 256.0;
+			float s_sin = sin(pass*M_PI/16) * mag;
+			float s_cos = cos(pass*M_PI/16) * mag;
+
+			float ssb = c_cos * s_cos - c_sin * s_sin;
+
+			buf[i] = shuffle(ssb*128 + 127);
 
 			// debug: flag our output on the 8th bit
 			if (i < pass)
@@ -63,7 +73,7 @@ main(void)
 		// wait for a signal that we're halfway
 		while((buf[0] & (1<<8)) == 0)
 			;
-		pass = (pass + 1) & 0xFF;
+		pass++;
 	}
 
 	return 0;
