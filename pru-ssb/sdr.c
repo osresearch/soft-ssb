@@ -84,7 +84,8 @@ generate_bit(
 			// Carrier frequency == 1e9 / (25 ns * (128 / N))
 			// f = 1e9 * N / (128 * 25)
 			// N = f * 128 * 25 / 1e9
-			int c_ti = i*8;
+			//int c_ti = i*16; // 5 MHz
+			int c_ti = i*8; // 2.5 MHz
 			int c_sin = +sin_table[(c_ti +  0) % 128];
 			int c_cos = -sin_table[(c_ti + 32) % 128];
 
