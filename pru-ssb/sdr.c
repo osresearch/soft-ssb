@@ -44,85 +44,6 @@ static const uint8_t psk_bits[] = ""
 "100" // space
 ;
 
-#if 0
-	int bit_offset = 0;
-	const int bit_count = sizeof(bits);
-	int do_ramp = 1;
-	int cur_bit = 0;
-	int new_bit = 0;
-	int phase = 0;
-
-	while (1)
-	{
-#if 1
-		// we want 31.250 Hz for our bit clock,
-		// 960000 / 31.250 == 30720 cycles
-#define ramp_size 4096
-#define bit_len 16384
-
-		if (sig == bit_len)
-		{
-			// time for the next bit
-			if (do_ramp)
-				phase ^= 1;
-
-			sig = 0;
-			cur_bit = new_bit;
-			//digitalWriteFast(12, phase == 0);
-		}
-
-		// signal sin and cos
-		uint16_t ps_i = sig >> 3;
-		if (phase)
-			ps_i += 64;
-
-		uint16_t pc_i = ps_i + 32;
-
-		int32_t ps = +sin_table[ps_i % 128];
-		int32_t pc = -sin_table[pc_i % 128];
-
-if (1)
-{
-		if (sig < ramp_size)
-		{
-			// ramp up if this bit is unchanged
-			if (do_ramp)
-			{
-				int32_t mag = sig;
-				ps = (ps * mag) / ramp_size;
-				pc = (pc * mag) / ramp_size;
-			}
-		}
-		if (sig == (bit_len - ramp_size))
-		{
-			new_bit = bits[bit_offset] == '1';
-			if (new_bit == 0)
-				do_ramp = 1;
-			else
-				do_ramp = 0;
-			bit_offset++;
-			if (bit_offset == bit_count)
-				bit_offset = 0;
-		}
-		if (sig > (bit_len - ramp_size))
-		{
-			// ramp down if this bit will not change
-			if (do_ramp)
-			{
-				int32_t mag = bit_len - sig;
-				ps = (ps * mag) / ramp_size;
-				pc = (pc * mag) / ramp_size;
-			}
-		}
-}
-#else
-		int mag = (sig >> 18) % 256;
-		ps = (ps * mag) / 256;
-		pc = (pc * mag) / 256;
-#endif
-
-#endif
-
 
 /** Output a PSK31 encoded bit.
  * Phase controls which sin/cos is used.
@@ -160,6 +81,9 @@ generate_bit(
 
 			// 25 ns per output, 16 outputs per cycle
 			// 400 ns per cycle == 2.5 MHz
+			// Carrier frequency == 1e9 / (25 ns * (128 / N))
+			// f = 1e9 * N / (128 * 25)
+			// N = f * 128 * 25 / 1e9
 			int c_ti = i*8;
 			int c_sin = +sin_table[(c_ti +  0) % 128];
 			int c_cos = -sin_table[(c_ti + 32) % 128];
