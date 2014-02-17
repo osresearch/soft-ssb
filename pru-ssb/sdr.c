@@ -30,7 +30,7 @@ shuffle(
 }
 
 
-static const uint8_t bits[] = ""
+static const uint8_t psk_bits[] = ""
 "1010110100" // C
 "11101110100" // Q
 "100" // space
@@ -188,17 +188,19 @@ output_bit(
 	const uint16_t * bit_buf
 )
 {
-	for (unsigned i = 0 ; i < 313 ; i++)
+	// send every 3rd section.  This keeps up with the correct
+	// bit timings.  total hack until we figure out a faster
+	// way to send the data to the PRU.
+	for (unsigned i = 0 ; i < 313 ; i += 3)
 	{
 		// wait for a signal that we're halfway
-		// so that buf is free.  this should go before, not after
+		// so that buf is free.
 		while((pru_buf[0] & (1<<8)) != 0)
 			;
 
-		memcpy(pru_buf, bit_buf, 8192);
+		memcpy(pru_buf, &bit_buf[i*4096], 8192);
 
 		pru_buf[0] |= (1 << 8) | (1 << 15);
-		bit_buf += 4096;
 	}
 }
 
@@ -221,6 +223,13 @@ main(void)
 	}
 
 
+	// we need bit streams for:
+	// phase 0 ramp up
+	// phase 0 solid
+	// phase 0 ramp down
+	// phase 1 ramp up
+	// phase 1 solid
+	// phase 1 ramp down
 	generate_bit(bits[0], 0, 0, 0);
 	generate_bit(bits[1], 0, 0, 1);
 	generate_bit(bits[2], 0, 1, 0);
@@ -242,10 +251,38 @@ main(void)
 
 	volatile uint16_t * const buf = (void*) pru_cmd;
 
+	int offset = 0;
+	const size_t len = sizeof(psk_bits) - 1;
+	int old_bit = 0;
+	int cur_bit = 0;
+	int new_bit = 0;
+	int phase = 0;
+
 	while (1)
 	{
-		output_bit(buf, bits[3]);
-		output_bit(buf, bits[7]);
+		offset = (offset + 1) % len;
+		old_bit = cur_bit;
+		cur_bit = new_bit;
+		new_bit = psk_bits[offset] == '1';
+
+		int ramp_up = 0;
+		int ramp_down = 0;
+
+		if (cur_bit == 0)
+		{
+			phase = !phase;
+			ramp_up = 1;
+		}
+
+		if (new_bit == 0)
+			ramp_down = 1;
+
+
+		output_bit(buf, bits[ 0
+			| phase << 2
+		       	| ramp_up << 1
+			| ramp_down << 0
+		]);
 	}
 
 	return 0;
