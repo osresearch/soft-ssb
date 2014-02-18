@@ -17,6 +17,7 @@
 #define out_offset r3
 #define length r4
 #define shared_ram r5
+#define frame r6
 
 
 #define NOP ADD r0, r0, 0
@@ -46,7 +47,8 @@ START:
     ST32	r0, r1
 
 	MOV zero, 0
-	MOV length, 8192
+	MOV frame, 0
+	MOV length, 4096
 	MOV shared_ram, 0x10000
 	SBBO zero, shared_ram, 0, 4
 
@@ -59,12 +61,18 @@ wait_loop:
 	LBBO offset, shared_ram, 0, 4
 	QBNE wait_loop, offset, 0
 
-	MOV offset, 0
-	MOV out_offset, 1024
-
 	// Let the user know we have read the command message
 	// and are making progress on it
 	SBCO zero, CONST_PRUDRAM, 0, 4
+
+	// alternate between two different buffers
+	MOV out_offset, 8192
+	XOR frame, frame, 1
+	QBEQ other_frame, frame, 0
+	MOV out_offset, 1024
+other_frame:
+
+	MOV offset, 0
 
 read_loop:
 	// Read 16 registers, 64 bytes worth of data
@@ -75,9 +83,9 @@ read_loop:
 	QBNE read_loop, offset, length
 
 	// Write the command to the other PRU
-	// should give it the offset that we've just written
-	MOV offset, 1024
-	SBBO offset, shared_ram, 0, 4
+	// should give it the offset where we started
+	SUB out_offset, out_offset, length
+	SBBO out_offset, shared_ram, 0, 4
 
 	// Wait for a new command
 	QBA restart

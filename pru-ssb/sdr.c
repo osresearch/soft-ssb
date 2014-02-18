@@ -84,7 +84,7 @@ generate_bit(
 		{
 			// 25 ns per output, 65536 outputs per cycle
 			// 1638400 ns per cycle == 610 Hz
-			int sig_ti = ((j << 12) + i) / 65536;
+			unsigned sig_ti = ((j << 12) + i) / (313*8);
 			if (phase)
 				sig_ti += 64;
 
@@ -111,7 +111,12 @@ generate_bit(
 			// ssb has range -1024 to 1024;
 			// convert to 0 to 256
 			//buf[4096*j + i] = shuffle(ssb / 8 + 127);
-			buf[4096*j + i] = shuffle(sin_table[(i/8) % 128] / 16 + 127);
+			buf[4096*j + i] = shuffle(sin_table[(i*8) % 128] / 16 + 127);
+			//int val = (c_sin/16 + 127);
+			//if (i > 1500 && i < 2048) val = 32;
+			//if (i > 2048 && i < 2400) val = 64+128;
+			//buf[4096*j + i] = shuffle(val);
+			//buf[4096*j + i] = shuffle(j & 1 ? (128 - j%64) : 128 + j%64);
 			//int test = +sin_table[(sig_ti +  0) % 128];
 			//buf[4096*j + i] = shuffle(test / 8 + 127);
 			//buf[4096*j + i] = shuffle(i & 0xFF);
@@ -143,9 +148,9 @@ output_bit(
 		// wait for a signal that we're halfway
 		// so that buf is free.
 
-		const uint32_t buf_offset = (frame_num++ & 0x3) * 8192;
+		const uint32_t buf_offset = (frame_num++ & 0x3) * 4096;
 		//uint32_t delta = -now();
-		memcpy((void*)(pru_buf + buf_offset), &bit_buf[i*4096], 8192);
+		memcpy((void*)(pru_buf + buf_offset), &bit_buf[i*2048], 4096);
 
 		//delta += now();
 

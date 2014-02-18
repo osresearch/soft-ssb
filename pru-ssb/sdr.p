@@ -46,13 +46,9 @@ START:
 
 	// ground all of our outputs
 	MOV r30, 0
-
-	MOV length, 8192 + 1024
-	MOV halfway, 4000 + 1024
 	MOV zero, 0
 
 	// Clear out mailbox
-	//SBCO zero, CONST_SHAREDRAM, 0, 4
 	MOV shared_ram, 0x10000
 	SBBO zero, shared_ram, 0, 4
 
@@ -61,7 +57,10 @@ restart:
 	LBBO offset, shared_ram, 0, 4
 	QBEQ restart, offset, 0
 
-	MOV offset, 1024
+	MOV length, 4096
+	ADD length, length, offset
+	MOV halfway, 300
+	ADD halfway, halfway, offset
 
 	CLR r30, 15
 
