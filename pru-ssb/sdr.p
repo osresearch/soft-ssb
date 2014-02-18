@@ -48,7 +48,7 @@ START:
 	MOV r30, 0
 
 	MOV length, 8192 + 1024
-	MOV halfway, 3000 + 1024
+	MOV halfway, 4000 + 1024
 	MOV zero, 0
 
 	// Clear out mailbox
@@ -63,9 +63,7 @@ restart:
 
 	MOV offset, 1024
 
-	// signal that we're half-way through
-	SBBO zero, shared_ram, 0, 4
-	SET r30, 15
+	CLR r30, 15
 
 read_loop1:
 	// Save some instructions -- read directly into the r30 output
@@ -76,13 +74,13 @@ read_loop1:
 
 	// signal that we're half-way through
 	SBBO zero, shared_ram, 0, 4
-	CLR r30, 15
 
 read_loop2:
 	LBBO r30, shared_ram, offset, 2	// 15 ns?
 	ADD offset, offset, 2			// 5 ns
 	QBNE read_loop2, offset, length		// 5 ns
 
+	SET r30, 15
 	QBA restart
 	
 EXIT:

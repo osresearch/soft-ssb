@@ -110,7 +110,8 @@ generate_bit(
 
 			// ssb has range -1024 to 1024;
 			// convert to 0 to 256
-			buf[4096*j + i] = shuffle(ssb / 8 + 127);
+			//buf[4096*j + i] = shuffle(ssb / 8 + 127);
+			buf[4096*j + i] = shuffle(sin_table[(i/8) % 128] / 16 + 127);
 			//int test = +sin_table[(sig_ti +  0) % 128];
 			//buf[4096*j + i] = shuffle(test / 8 + 127);
 			//buf[4096*j + i] = shuffle(i & 0xFF);
@@ -145,9 +146,6 @@ output_bit(
 		const uint32_t buf_offset = (frame_num++ & 0x3) * 8192;
 		//uint32_t delta = -now();
 		memcpy((void*)(pru_buf + buf_offset), &bit_buf[i*4096], 8192);
-
-		for (int i=0 ; i < 16 ; i++)
-			pru_buf[buf_offset + i] |= 1 << 15;
 
 		//delta += now();
 

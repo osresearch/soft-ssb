@@ -56,7 +56,6 @@ restart:
 
 wait_loop:
 	// Wait for the other PRU to indicate that it is halfway
-	//LBCO offset, CONST_SHAREDRAM, 0, 4
 	LBBO offset, shared_ram, 0, 4
 	QBNE wait_loop, offset, 0
 
