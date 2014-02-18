@@ -9,7 +9,7 @@ eventmap.LDLIBS := \
 	-lX11 \
 	-lXtst \
 
-all: $(TARGETS) sdr.bin
+all: $(TARGETS) sdr.bin sdr-helper.bin
 
 ifeq ($(shell uname -m),armv7l)
 # We are on the BeagleBone Black itself;

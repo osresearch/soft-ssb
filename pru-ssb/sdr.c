@@ -8,10 +8,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <math.h>
 #include "pru.h"
 
 static int sin_table[128];
+
+static inline uint32_t
+now(void)
+{
+	static uint32_t start_epoch;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	if (start_epoch == 0)
+		start_epoch = tv.tv_sec;
+	return (tv.tv_sec - start_epoch) * 1000000 + tv.tv_usec;
+}
 
 static uint16_t
 shuffle(
@@ -99,6 +111,9 @@ generate_bit(
 			// ssb has range -1024 to 1024;
 			// convert to 0 to 256
 			buf[4096*j + i] = shuffle(ssb / 8 + 127);
+			//int test = +sin_table[(sig_ti +  0) % 128];
+			//buf[4096*j + i] = shuffle(test / 8 + 127);
+			//buf[4096*j + i] = shuffle(i & 0xFF);
 
 			// mark an unused bit; the pru will zero
 			// this when it is halfway through the buffer.
@@ -109,23 +124,41 @@ generate_bit(
 
 static void
 output_bit(
-	volatile uint16_t * const pru_buf,
+	volatile uintptr_t * const pru_cmd,
+	volatile uint8_t * const pru_buf,
+	const uintptr_t pru_buf_addr,
 	const uint16_t * bit_buf
 )
 {
+	static unsigned frame_num = 0;
+	static uint32_t last_out;
+
 	// send every 3rd section.  This keeps up with the correct
 	// bit timings.  total hack until we figure out a faster
 	// way to send the data to the PRU.
-	for (unsigned i = 0 ; i < 313 ; i += 3)
+
+	for (unsigned i = 0 ; i < 313 ; i++)
 	{
 		// wait for a signal that we're halfway
 		// so that buf is free.
-		while((pru_buf[0] & (1<<8)) != 0)
+
+		const uint32_t buf_offset = (frame_num++ & 0x3) * 8192;
+		//uint32_t delta = -now();
+		memcpy((void*)(pru_buf + buf_offset), &bit_buf[i*4096], 8192);
+
+		for (int i=0 ; i < 16 ; i++)
+			pru_buf[buf_offset + i] |= 1 << 15;
+
+		//delta += now();
+
+		//last_out = now();
+		while(*pru_cmd)
 			;
+		//uint32_t out_time = now();
 
-		memcpy(pru_buf, &bit_buf[i*4096], 8192);
-
-		pru_buf[0] |= (1 << 8) | (1 << 15);
+		*pru_cmd = pru_buf_addr + buf_offset;
+		//printf("sent %d %u %u\n", frame_num, delta, out_time - last_out);
+		//last_out = out_time;
 	}
 }
 
@@ -164,17 +197,27 @@ main(void)
 	generate_bit(bits[6], 1, 1, 0);
 	generate_bit(bits[7], 1, 1, 1);
 
-	pru_t * const pru = pru_init(0);
+	pru_t * const pru0 = pru_init(0);
+	pru_t * const pru1 = pru_init(1);
 
-	uint32_t * const pru_cmd = pru->data_ram;
-	uint8_t * const vram = pru->ddr;
-
-	pru_exec(pru, "./sdr.bin");
-	printf("pru %p\n", pru);
-	printf("cmd %p\n", pru_cmd);
-	printf("ddr %p (%08x)\n", vram, pru->ddr_addr);
+	uint32_t * const pru_cmd = pru1->data_ram;
+	uint8_t * const vram = pru1->ddr;
 
 	volatile uint16_t * const buf = (void*) pru_cmd;
+
+	// ensure that both mailboxes are empty
+	*(uint32_t*) pru0->data_ram = 0;
+	*(uint32_t*) pru1->data_ram = 0;
+
+	printf("pru %p %p\n", pru0, pru1);
+	printf("cmd %p %p\n", pru0->data_ram, pru1->data_ram);
+	printf("ddr %p (%08x) %p (%08x)\n",
+		pru0->ddr, pru0->ddr_addr,
+		pru1->ddr, pru1->ddr_addr
+	);
+
+	pru_exec(pru0, "./sdr.bin");
+	pru_exec(pru1, "./sdr-helper.bin");
 
 	int offset = 0;
 	const size_t len = sizeof(psk_bits) - 1;
@@ -203,11 +246,16 @@ main(void)
 			ramp_down = 1;
 
 
-		output_bit(buf, bits[ 0
-			| phase << 2
-		       	| ramp_up << 1
-			| ramp_down << 0
-		]);
+		output_bit(
+			pru_cmd,
+			vram,
+			pru1->ddr_addr,
+			bits[ 0
+				| phase << 2
+				| ramp_up << 1
+				| ramp_down << 0
+			]
+		);
 	}
 
 	return 0;
