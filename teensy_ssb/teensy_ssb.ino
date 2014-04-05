@@ -6,7 +6,7 @@
  * GPIO mappings on the Teensy 3.1: http://forum.pjrc.com/threads/17532-Tutorial-on-digital-I-O-ATMega-PIN-PORT-DDR-D-B-registers-vs-ARM-GPIO_PDIR-_PDOR
  */
 
-uint8_t sin_table[1024];
+uint8_t sin_table[4096];
 
 //IntervalTimer carrier_timer;
 
