@@ -4,10 +4,21 @@
  *
  * Good reference to the DMA engine: http://forum.pjrc.com/threads/23950-Parallel-GPIO-on-Teensy-3-0
  * GPIO mappings on the Teensy 3.1: http://forum.pjrc.com/threads/17532-Tutorial-on-digital-I-O-ATMega-PIN-PORT-DDR-D-B-registers-vs-ARM-GPIO_PDIR-_PDOR
+ *
+ * The DMA clocks out the bytes to the GPIO at 20 MHz.
+ * This limits the possible output speed to about 1 MHz.
+ *
+ * The ramp up / ramp down for the PSK31 signal is 15 ms, which would require
+ * too much memory to store (294 KB).  Thus it must be computed on the fly.
+ * The sin table is pre-computed with signed 16-bit values.
+ *
+ * The DMA engines ping-pongs between buffer 1 and buffer 2.
  */
 
-//uint8_t sin_table[30000];
-uint8_t ramp_up_table[32768];
+int16_t sin_table[1024];
+uint8_t carrier[8192];
+uint8_t buf1[8192];
+uint8_t buf2[8192];
 
 //IntervalTimer carrier_timer;
 
@@ -46,6 +57,19 @@ setup(void)
 	pinMode(LED_PIN, OUTPUT);
 	led(1);
 
+	for (int i = 0 ; i < sizeof(sin_table) ; i++)
+	{
+		float s = sin(i * 2 * M_PI / sizeof(sin_table));
+		sin_table[i] = s * 1024;
+	}
+
+	for (int i = 0 ; i < sizeof(carrier) ; i++)
+	{
+		float s = sin(1024 * i * 2 * M_PI / sizeof(carrier));
+		carrier[i] = s * 128 + 127;
+	}
+
+/*
 	for (int i = 0 ; i < sizeof(ramp_up_table) ; i++)
 	{
 		//float s = sin(1024*i*M_PI/sizeof(sin_table));
@@ -58,6 +82,7 @@ setup(void)
 
 		//sin_table[i] = (i&1) ? 0xFF : 00;
 	}
+*/
 
 	// configure the 8 output pins, which will be mapped
 	// to the DMA engine.
@@ -82,16 +107,18 @@ setup(void)
 }
 
 
+/** Configure DMA1 to chain to DMA2, which chains to DMA1. */
 void
 dma_send(
-	const void * const p,
+	const void * const p1,
+	const void * const p2,
 	size_t len
 )
 {
         DMA_TCD1_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
         DMA_TCD1_NBYTES_MLNO = len; // one byte at a time
 
-	DMA_TCD1_SADDR = p;
+	DMA_TCD1_SADDR = p1;
         DMA_TCD1_SOFF = 1; // update byte at a time
         DMA_TCD1_SLAST = -len; // go back to the start of the buffer
 
@@ -110,9 +137,9 @@ dma_send(
         DMA_TCD2_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
         DMA_TCD2_NBYTES_MLNO = len; // one byte at a time
 
-	DMA_TCD2_SADDR = len-1 + (uint8_t*) p;
-        DMA_TCD2_SOFF = -1; // update byte at a time
-        DMA_TCD2_SLAST = +len; // go back to the start of the buffer
+	DMA_TCD2_SADDR = p2;
+        DMA_TCD2_SOFF = 1; // update byte at a time
+        DMA_TCD2_SLAST = -len; // go back to the start of the buffer
 
 	DMA_TCD2_DADDR = &GPIOD_PDOR;
         DMA_TCD2_DOFF = 0; // don't update destination
