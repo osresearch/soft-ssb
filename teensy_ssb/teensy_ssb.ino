@@ -6,7 +6,7 @@
  * GPIO mappings on the Teensy 3.1: http://forum.pjrc.com/threads/17532-Tutorial-on-digital-I-O-ATMega-PIN-PORT-DDR-D-B-registers-vs-ARM-GPIO_PDIR-_PDOR
  */
 
-uint8_t sin_table[128];
+uint8_t sin_table[1024];
 
 //IntervalTimer carrier_timer;
 
@@ -45,9 +45,9 @@ setup(void)
 	pinMode(LED_PIN, OUTPUT);
 	led(1);
 
-	for (int i = 0 ; i < 128 ; i++)
+	for (int i = 0 ; i < sizeof(sin_table) ; i++)
 	{
-		sin_table[i] = sin(4*i * M_PI / 64) * 128 + 127;
+		sin_table[i] = sin(128*i * M_PI / sizeof(sin_table)) * 128 + 127;
 		//sin_table[i] = (i&1) ? 0xFF : 00;
 	}
 
