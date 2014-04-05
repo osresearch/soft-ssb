@@ -6,7 +6,8 @@
  * GPIO mappings on the Teensy 3.1: http://forum.pjrc.com/threads/17532-Tutorial-on-digital-I-O-ATMega-PIN-PORT-DDR-D-B-registers-vs-ARM-GPIO_PDIR-_PDOR
  */
 
-uint8_t sin_table[4096];
+//uint8_t sin_table[30000];
+uint8_t ramp_up_table[32768];
 
 //IntervalTimer carrier_timer;
 
@@ -45,9 +46,16 @@ setup(void)
 	pinMode(LED_PIN, OUTPUT);
 	led(1);
 
-	for (int i = 0 ; i < sizeof(sin_table) ; i++)
+	for (int i = 0 ; i < sizeof(ramp_up_table) ; i++)
 	{
-		sin_table[i] = sin(128*i * M_PI / sizeof(sin_table)) * 128 + 127;
+		//float s = sin(1024*i*M_PI/sizeof(sin_table));
+		//float s = cos(8*i*2*M_PI/sizeof(sin_table));
+		//float s = cos(2048*i*2*M_PI/sizeof(ramp_up_table));
+		float s = cos(8*i*2*M_PI/sizeof(ramp_up_table));
+		float c_up = cos((sizeof(ramp_up_table) - i - 1)*M_PI/sizeof(ramp_up_table)/2);
+		//sin_table[i] = s * 128 + 127;
+		ramp_up_table[i] = s * c_up * 128 + 127;
+
 		//sin_table[i] = (i&1) ? 0xFF : 00;
 	}
 
@@ -96,8 +104,26 @@ dma_send(
         DMA_TCD1_CITER_ELINKNO = 1;
         DMA_TCD1_BITER_ELINKNO = 1;
 
-        DMA_TCD1_CSR = DMA_TCD_CSR_START | (1 << 8) | (1<<5);
+        DMA_TCD1_CSR = DMA_TCD_CSR_START | (2 << 8) | (1<<5);
 	//DMA_SSRT = DMA_SSRT_SSRT(1);
+
+        DMA_TCD2_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
+        DMA_TCD2_NBYTES_MLNO = len; // one byte at a time
+
+	DMA_TCD2_SADDR = len-1 + (uint8_t*) p;
+        DMA_TCD2_SOFF = -1; // update byte at a time
+        DMA_TCD2_SLAST = +len; // go back to the start of the buffer
+
+	DMA_TCD2_DADDR = &GPIOD_PDOR;
+        DMA_TCD2_DOFF = 0; // don't update destination
+        DMA_TCD2_DLASTSGA = 0;
+
+	// BITER sets the number of inner loops to be run;
+	// must be equal to CITER when start is set.
+        DMA_TCD2_CITER_ELINKNO = 1;
+        DMA_TCD2_BITER_ELINKNO = 1;
+
+        DMA_TCD2_CSR = (1 << 8) | (1<<5);
 }
 
 
@@ -144,7 +170,8 @@ static const uint8_t bits[] = "1234";
 void
 loop(void)
 {
-	dma_send(sin_table, sizeof(sin_table));
+	//dma_send(sin_table, sizeof(sin_table));
+	dma_send(ramp_up_table, sizeof(ramp_up_table));
 
 	while (1)
 	{
