@@ -9,39 +9,16 @@
  * This limits the possible output speed to about 1 MHz.
  *
  * The ramp up / ramp down for the PSK31 signal is 15 ms, which would require
- * too much memory to store (294 KB).  Thus it must be computed on the fly.
- * The sin table is pre-computed with signed 16-bit values.
+ * too much memory to store (294 KB).  Instead 64 512 byte snippets of
+ * carrier are used, each at a different amplitude.
  *
  * The DMA engines ping-pongs between buffer 1 and buffer 2.
  */
 
-int16_t sin_table[1024];
-uint8_t carrier[8192];
-uint8_t buf1[8192];
-uint8_t buf2[8192];
-
-//IntervalTimer carrier_timer;
-
-static void
-periodic_timer_configure(
-	uint32_t interval
-)
-{
-	// Enable clock to PIT  
-	SIM_SCGC6 |= SIM_SCGC6_PIT;
-
-	// Enable PIT module  
-	PIT_MCR = 0;
-
-	// Set re-load value  
-	PIT_LDVAL0 = interval-1;  
-
-	// Enable this channel without interrupts  
-	PIT_TCTRL0 = 1;
-
-	// Clear timer flag  
-	PIT_TFLG0 = 1;
-}
+#define POWER_LEVELS	64
+#define DMA_LENGTH	512
+#define FREQUENCY	32
+uint8_t carrier[POWER_LEVELS][DMA_LENGTH];
 
 #define LED_PIN 13
 static inline void
@@ -57,32 +34,14 @@ setup(void)
 	pinMode(LED_PIN, OUTPUT);
 	led(1);
 
-	for (int i = 0 ; i < sizeof(sin_table) ; i++)
+	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
-		float s = sin(i * 2 * M_PI / sizeof(sin_table));
-		sin_table[i] = s * 1024;
+		for (int t = 0 ; t < DMA_LENGTH ; t++)
+		{
+			float c = cos(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
+			carrier[power][t] = c * power / POWER_LEVELS * 128 + 127;
+		}
 	}
-
-	for (int i = 0 ; i < sizeof(carrier) ; i++)
-	{
-		float s = sin(1024 * i * 2 * M_PI / sizeof(carrier));
-		carrier[i] = s * 128 + 127;
-	}
-
-/*
-	for (int i = 0 ; i < sizeof(ramp_up_table) ; i++)
-	{
-		//float s = sin(1024*i*M_PI/sizeof(sin_table));
-		//float s = cos(8*i*2*M_PI/sizeof(sin_table));
-		//float s = cos(2048*i*2*M_PI/sizeof(ramp_up_table));
-		float s = cos(8*i*2*M_PI/sizeof(ramp_up_table));
-		float c_up = cos((sizeof(ramp_up_table) - i - 1)*M_PI/sizeof(ramp_up_table)/2);
-		//sin_table[i] = s * 128 + 127;
-		ramp_up_table[i] = s * c_up * 128 + 127;
-
-		//sin_table[i] = (i&1) ? 0xFF : 00;
-	}
-*/
 
 	// configure the 8 output pins, which will be mapped
 	// to the DMA engine.
@@ -102,11 +61,56 @@ setup(void)
 
 	DMA_CR = 0;
 
-	DMA_ERQ |= DMA_ERQ_ERQ1;
-	DMA_SERQ = DMA_SERQ_SERQ(1);
+	DMA_ERQ |= DMA_ERQ_ERQ1 | DMA_ERQ_ERQ2;
+
+	// operate byte at a time on reads and writes
+        DMA_TCD1_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
+        DMA_TCD2_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
+
+	// configure both for a no power state
+	DMA_TCD1_SADDR = carrier[0];
+	DMA_TCD2_SADDR = carrier[0];
+
+        DMA_TCD1_NBYTES_MLNO = DMA_LENGTH;
+        DMA_TCD2_NBYTES_MLNO = DMA_LENGTH;
+
+	// update byte at a time
+        DMA_TCD1_SOFF = 1;
+        DMA_TCD2_SOFF = 1;
+
+	// go back to the start of the buffer after the major transfer
+        DMA_TCD1_SLAST = -DMA_LENGTH;
+        DMA_TCD2_SLAST = -DMA_LENGTH;
+
+	// write the output to the PORTD
+	DMA_TCD1_DADDR = &GPIOD_PDOR;
+	DMA_TCD2_DADDR = &GPIOD_PDOR;
+
+	// don't update destination at all; each byte writes to GPIOD_PDOR
+        DMA_TCD1_DOFF = 0;
+        DMA_TCD2_DOFF = 0;
+
+        DMA_TCD1_DLASTSGA = 0;
+        DMA_TCD2_DLASTSGA = 0;
+
+	// BITER sets the number of inner loops to be run;
+	// must be equal to CITER when start is set.
+        DMA_TCD1_CITER_ELINKNO = 1;
+        DMA_TCD1_BITER_ELINKNO = 1;
+
+        DMA_TCD2_CITER_ELINKNO = 1;
+        DMA_TCD2_BITER_ELINKNO = 1;
+
+	// DMA1 links to DMA2 which links to DMA1
+        DMA_TCD1_CSR = DMA_TCD_CSR_MAJORLINKCH(2) | DMA_TCD_CSR_MAJORELINK;
+        DMA_TCD2_CSR = DMA_TCD_CSR_MAJORLINKCH(1) | DMA_TCD_CSR_MAJORELINK;
+
+	// start DMA1
+	DMA_TCD1_CSR |= DMA_TCD_CSR_START;
 }
 
 
+#if 0
 /** Configure DMA1 to chain to DMA2, which chains to DMA1. */
 void
 dma_send(
@@ -152,10 +156,37 @@ dma_send(
 
         DMA_TCD2_CSR = (1 << 8) | (1<<5);
 }
+#endif
+
+
+/**
+ * Swap the DMA engines safely.
+ * Wait for dma1 to be "done" so that we can swap it safely.
+ * then wait for dma2 to be "done".  
+ */
+static void
+dma_swap(
+	const void * const buf
+)
+{
+	// clear the DMA1 done flag and wait for it to be reset
+	DMA_CDNE = DMA_CDNE_CDNE(1);
+	while (DMA_TCD1_CSR & DMA_TCD_CSR_DONE)
+		;
+	// DMA1 is now safe to swap
+	DMA_TCD1_SADDR = buf;
+
+	// clear the DMA2 done flag and wait for it to be reset
+	DMA_CDNE = DMA_CDNE_CDNE(2);
+	while (DMA_TCD2_CSR & DMA_TCD_CSR_DONE)
+		;
+	// DMA2 is now safe to swap
+	DMA_TCD2_SADDR = buf;
+}
 
 
 static inline int
-dma_complete(void)
+dma_complete(int which)
 {
 	int rc = DMA_TCD1_CSR & DMA_TCD_CSR_DONE;
 	//if (rc)
@@ -198,8 +229,15 @@ void
 loop(void)
 {
 	//dma_send(sin_table, sizeof(sin_table));
-	dma_send(ramp_up_table, sizeof(ramp_up_table));
+	//dma_send(ramp_up_table, sizeof(ramp_up_table));
 
+	for (int power = 0 ; power < POWER_LEVELS ; power++)
+	{
+		dma_swap(carrier[power]);
+		delay(100);
+	}
+
+#if 0
 	while (1)
 	{
 		led(0); delay(400);
@@ -211,7 +249,6 @@ loop(void)
 	while (!dma_complete())
 		;
 
-#if 0
 	uint32_t sig = 0;
 	int bit_offset = 0;
 	const int bit_count = sizeof(bits);
