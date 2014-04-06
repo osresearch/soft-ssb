@@ -216,8 +216,53 @@ dma_swap(
 10111000
 */
 
-static const uint8_t bits[] = "1234";
 
+
+static void
+send(int bit)
+{
+	static int phase;
+
+	if (bit == 0)
+	{
+		// ramp down
+		for (int power = POWER_LEVELS-1 ; power >= 0 ; power--)
+		{
+			dma_swap(carrier[phase][power]);
+			delayMicroseconds(500);
+		}
+
+		// and ramp back up on the other phase
+		phase = !phase;
+
+		for (int power = 0 ; power < POWER_LEVELS ; power++)
+		{
+			dma_swap(carrier[phase][power]);
+			delayMicroseconds(500);
+		}
+	} else {
+		for (int power = 0 ; power < 2*POWER_LEVELS ; power++)
+		{
+			dma_swap(carrier[phase][POWER_LEVELS-1]);
+			delayMicroseconds(500);
+		}
+	}
+}
+		
+
+static const uint8_t psk_bits[] = ""
+"1010110100" // C
+"11101110100" // Q
+"100" // space
+"1010110100" // C
+"11101110100" // Q
+"100" // space
+"1101110100" // N
+"10111101100" // Y
+"1111111100" // 3
+"10101011100" // U
+"100" // space
+;
 
 
 void
@@ -225,19 +270,10 @@ loop(void)
 {
 	//dma_send(sin_table, sizeof(sin_table));
 	//dma_send(ramp_up_table, sizeof(ramp_up_table));
-	static int phase;
 
-	phase = !phase;
-
-	for (int power = 0 ; power < POWER_LEVELS ; power++)
+	for (int i = 0 ; i < sizeof(psk_bits) ; i++)
 	{
-		dma_swap(carrier[phase][power]);
-		delayMicroseconds(500);
-	}
-	for (int power = POWER_LEVELS-1 ; power >= 0 ; power--)
-	{
-		dma_swap(carrier[phase][power]);
-		delayMicroseconds(500);
+		send(psk_bits[i] == '1');
 	}
 
 #if 0
