@@ -15,9 +15,9 @@
  * The DMA engines ping-pongs between buffer 1 and buffer 2.
  */
 
-#define POWER_LEVELS	64
+#define POWER_LEVELS	32
 #define DMA_LENGTH	512
-#define FREQUENCY	32
+#define FREQUENCY	4 // multiple of 40 KHz
 uint8_t carrier[POWER_LEVELS][DMA_LENGTH];
 
 #define LED_PIN 13
@@ -36,10 +36,11 @@ setup(void)
 
 	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
+		float p = sin(power * M_PI/POWER_LEVELS);
 		for (int t = 0 ; t < DMA_LENGTH ; t++)
 		{
 			float c = cos(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
-			carrier[power][t] = c * power / POWER_LEVELS * 128 + 127;
+			carrier[power][t] = c * p * 128 + 127;
 		}
 	}
 
@@ -234,7 +235,12 @@ loop(void)
 	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
 		dma_swap(carrier[power]);
-		delay(100);
+		delay(1);
+	}
+	for (int power = POWER_LEVELS-1 ; power >= 0 ; power--)
+	{
+		dma_swap(carrier[power]);
+		delay(1);
 	}
 
 #if 0
