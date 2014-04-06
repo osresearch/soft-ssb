@@ -17,8 +17,8 @@
 
 #define POWER_LEVELS	32
 #define DMA_LENGTH	512
-#define FREQUENCY	4 // multiple of 40 KHz
-uint8_t carrier[POWER_LEVELS][DMA_LENGTH];
+#define FREQUENCY	32 // multiple of 40 KHz
+uint8_t carrier[2][POWER_LEVELS][DMA_LENGTH];
 
 #define LED_PIN 13
 static inline void
@@ -36,11 +36,15 @@ setup(void)
 
 	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
-		float p = sin(power * M_PI/POWER_LEVELS);
+		float p = sin(power * M_PI/POWER_LEVELS/2);
+
 		for (int t = 0 ; t < DMA_LENGTH ; t++)
 		{
-			float c = cos(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
-			carrier[power][t] = c * p * 128 + 127;
+			float c1 = sin(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
+			float c2 = cos(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
+			//float c = 1; // to display just the phase
+			carrier[0][power][t] = c1 * p * 128 + 127;
+			carrier[1][power][t] = c2 * p * 128 + 127;
 		}
 	}
 
@@ -69,8 +73,8 @@ setup(void)
         DMA_TCD2_ATTR = DMA_TCD_ATTR_SSIZE(0) | DMA_TCD_ATTR_DSIZE(0);
 
 	// configure both for a no power state
-	DMA_TCD1_SADDR = carrier[0];
-	DMA_TCD2_SADDR = carrier[0];
+	DMA_TCD1_SADDR = carrier[0][0];
+	DMA_TCD2_SADDR = carrier[0][0];
 
         DMA_TCD1_NBYTES_MLNO = DMA_LENGTH;
         DMA_TCD2_NBYTES_MLNO = DMA_LENGTH;
@@ -172,27 +176,17 @@ dma_swap(
 {
 	// clear the DMA1 done flag and wait for it to be reset
 	DMA_CDNE = DMA_CDNE_CDNE(1);
-	while (DMA_TCD1_CSR & DMA_TCD_CSR_DONE)
+	while (!(DMA_TCD1_CSR & DMA_TCD_CSR_DONE))
 		;
 	// DMA1 is now safe to swap
 	DMA_TCD1_SADDR = buf;
 
 	// clear the DMA2 done flag and wait for it to be reset
 	DMA_CDNE = DMA_CDNE_CDNE(2);
-	while (DMA_TCD2_CSR & DMA_TCD_CSR_DONE)
+	while (!(DMA_TCD2_CSR & DMA_TCD_CSR_DONE))
 		;
 	// DMA2 is now safe to swap
 	DMA_TCD2_SADDR = buf;
-}
-
-
-static inline int
-dma_complete(int which)
-{
-	int rc = DMA_TCD1_CSR & DMA_TCD_CSR_DONE;
-	//if (rc)
-		//DMA_TCD1_CSR &= ~DMA_TCD_CSR_DONE;
-	return rc;
 }
 
 
@@ -231,16 +225,19 @@ loop(void)
 {
 	//dma_send(sin_table, sizeof(sin_table));
 	//dma_send(ramp_up_table, sizeof(ramp_up_table));
+	static int phase;
+
+	phase = !phase;
 
 	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
-		dma_swap(carrier[power]);
-		delay(1);
+		dma_swap(carrier[phase][power]);
+		delayMicroseconds(500);
 	}
 	for (int power = POWER_LEVELS-1 ; power >= 0 ; power--)
 	{
-		dma_swap(carrier[power]);
-		delay(1);
+		dma_swap(carrier[phase][power]);
+		delayMicroseconds(500);
 	}
 
 #if 0
