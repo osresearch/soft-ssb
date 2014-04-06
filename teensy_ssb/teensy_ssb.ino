@@ -17,7 +17,7 @@
 
 #define POWER_LEVELS	32
 #define DMA_LENGTH	512
-#define FREQUENCY	32 // multiple of 40 KHz
+#define FREQUENCY	64 // multiple of 40 KHz
 uint8_t carrier[2][POWER_LEVELS][DMA_LENGTH];
 
 #define LED_PIN 13
@@ -37,14 +37,21 @@ setup(void)
 	for (int power = 0 ; power < POWER_LEVELS ; power++)
 	{
 		float p = sin(power * M_PI/POWER_LEVELS/2);
+		//p = sqrt(p); // makes a faster ramp up
 
 		for (int t = 0 ; t < DMA_LENGTH ; t++)
 		{
 			float c1 = sin(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
-			float c2 = cos(FREQUENCY * t * 2 * M_PI / DMA_LENGTH);
-			//float c = 1; // to display just the phase
+			float c2 = sin(FREQUENCY * t * 2 * M_PI / DMA_LENGTH + M_PI);
+			//c1 = 1;
+			//c2 = -1;
+if(1) {
 			carrier[0][power][t] = c1 * p * 128 + 127;
 			carrier[1][power][t] = c2 * p * 128 + 127;
+} else {
+			carrier[0][power][t] = c1 *  128 + 127;
+			carrier[1][power][t] = c2 *  128 + 127;
+}
 		}
 	}
 
@@ -225,27 +232,26 @@ send(int bit)
 
 	if (bit == 0)
 	{
-		// ramp down
-		for (int power = POWER_LEVELS-1 ; power >= 0 ; power--)
+		// ramp down for half the bit width
+		for (int power = POWER_LEVELS-1 ; power > 0 ; power--)
 		{
 			dma_swap(carrier[phase][power]);
-			delayMicroseconds(500);
+			delayMicroseconds(32000 / POWER_LEVELS / 2);
 		}
 
 		// and ramp back up on the other phase
 		phase = !phase;
+		led(phase);
 
 		for (int power = 0 ; power < POWER_LEVELS ; power++)
 		{
 			dma_swap(carrier[phase][power]);
-			delayMicroseconds(500);
+			delayMicroseconds(32000 / POWER_LEVELS / 2);
 		}
 	} else {
-		for (int power = 0 ; power < 2*POWER_LEVELS ; power++)
-		{
-			dma_swap(carrier[phase][POWER_LEVELS-1]);
-			delayMicroseconds(500);
-		}
+		// maintain the current phase for the full width
+		dma_swap(carrier[phase][POWER_LEVELS-1]);
+		delayMicroseconds(32000);
 	}
 }
 		
@@ -271,7 +277,7 @@ loop(void)
 	//dma_send(sin_table, sizeof(sin_table));
 	//dma_send(ramp_up_table, sizeof(ramp_up_table));
 
-	for (int i = 0 ; i < sizeof(psk_bits) ; i++)
+	for (int i = 0 ; i < sizeof(psk_bits)-1 ; i++)
 	{
 		send(psk_bits[i] == '1');
 	}
